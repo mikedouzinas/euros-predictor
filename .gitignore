@@ -158,3 +158,10 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+all_matches_combined.csv
+away_goals_predictor.pkl
+away_xg_predictor.pkl
+euro_2024_matches.csv
+euro_2024_score_predictions_with_winner.csv
+home_goals_predictor.pkl
+home_xg_predictor.pkl

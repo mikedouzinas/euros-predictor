@@ -4,7 +4,6 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 
-
 def train_model():
     # Load the combined data with FIFA rankings
     all_matches_df = pd.read_csv('all_matches_combined.csv')
@@ -12,8 +11,8 @@ def train_model():
     # Fill missing values for actual goals and xG
     all_matches_df['home_goals'].fillna(0, inplace=True)
     all_matches_df['away_goals'].fillna(0, inplace=True)
-    all_matches_df['home_xg'].fillna(all_matches_df['home_goals']*.5, inplace=True)
-    all_matches_df['away_xg'].fillna(all_matches_df['away_goals']*.5, inplace=True)
+    all_matches_df['home_xg'].fillna(all_matches_df['home_goals']*0.5, inplace=True)
+    all_matches_df['away_xg'].fillna(all_matches_df['away_goals']*0.5, inplace=True)
 
     # Define features and target
     features = ['home_rank', 'away_rank']
@@ -68,6 +67,5 @@ def train_model():
     print(f"Mean Squared Error (Away Goals): {mse_away_goals}")
     print(f"Mean Squared Error (Home xG): {mse_home_xg}")
     print(f"Mean Squared Error (Away xG): {mse_away_xg}")
-    
-    
+
 train_model()

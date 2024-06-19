@@ -5,43 +5,13 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-# Define the Scrapy Spider
-class MenrankingSpider(scrapy.Spider):
-    name = 'menranking'
-    allowed_domains = ['fifa.com']
-    start_urls = ['https://www.fifa.com/api/ranking-overview?locale=en&dateId=id13974']
 
-    def parse(self, response):
-        data = json.loads(response.body)
-        rankings = {}
-        for ranking_data in data['rankings']:
-            country = str(ranking_data['rankingItem']['name']).lower().replace("usa", "united states")
-            rank = int(ranking_data['rankingItem']['rank'])
-            rankings[country] = int(rank)
-        return rankings
-
-# Run the Scrapy Spider Programmatically
-def run_spider():
-    process = CrawlerProcess({
-        'USER_AGENT': 'Mozilla/5.0',
-        'LOG_LEVEL': 'ERROR',
-        'FEEDS': {
-            'fifa_rankings.json': {
-                'format': 'json',
-                'overwrite': True
-            },
-        },
-    })
-    process.crawl(MenrankingSpider)
-    process.start()
 
 # Function to fetch FIFA rankings using Scrapy and process the data
 def fetch_and_process_fifa_rankings():
-    run_spider()
-
-    # Load the JSON data
-    fifa_rankings = pd.read_json('fifa_rankings.json')
-    return fifa_rankings # returns a dictionary of fifa_rankings
+    with open('fifa_rankings.json', 'r') as f:
+        fifa_rankings = json.load(f)
+    return fifa_rankings # returns a dictionary of fifa rankings
 
 def parse_match_data(row, competition_name, fifa_rankings, columns):
     cols = row.find_all(['th', 'td'])
@@ -139,6 +109,7 @@ def configure_data():
     euro_qualifying_url = 'https://fbref.com/en/comps/678/schedule/UEFA-Euro-Qualifying-Scores-and-Fixtures'
     world_cup_2022_url = 'https://fbref.com/en/comps/1/schedule/World-Cup-Scores-and-Fixtures'
     euro_2021_url = 'https://fbref.com/en/comps/676/2021/schedule/2021-European-Championship-Scores-and-Fixtures'
+    euro_2024_url = 'https://fbref.com/en/comps/676/schedule/European-Championship-Scores-and-Fixtures'
 
     # Columns for Euro Qualifying 2024 and World Cup 2022 (if different)
     euro_qualifying_columns = {
@@ -181,11 +152,18 @@ def configure_data():
     euro_2021_df = scrape_and_prepare_data(euro_2021_url, 'Euro 2021', fifa_rankings, world_cup_2022_columns)  # Assuming columns are same as world_cup_2022_columns
 
     # Fetch the fixtures for Euro 2024
-    euro_2024_fixtures_df = scrape_and_prepare_data('https://fbref.com/en/comps/676/schedule/European-Championship-Scores-and-Fixtures', 'Euro 2024', fifa_rankings, euro_2024_columns)
+    euro_2024_fixtures_df = scrape_and_prepare_data(euro_2024_url, 'Euro 2024', fifa_rankings, euro_2024_columns)
+    
+    # Add a column to indicate whether a game has been played
+    euro_2024_fixtures_df['played'] = euro_2024_fixtures_df['home_goals'].notna() & euro_2024_fixtures_df['away_goals'].notna()
+    
     euro_2024_fixtures_df.to_csv('euro_2024_matches.csv', index=False)
 
+    # Create a DataFrame for only the played games
+    euro_2024_played_df = euro_2024_fixtures_df[euro_2024_fixtures_df['played']]
+    
     # Combine all the data into one DataFrame
-    all_matches_df = pd.concat([euro_qualifying_df, world_cup_2022_df, euro_2021_df], ignore_index=True)
+    all_matches_df = pd.concat([euro_qualifying_df, world_cup_2022_df, euro_2021_df, euro_2024_played_df], ignore_index=True)
 
     # Feature Engineering
     all_matches_df['goal_difference'] = all_matches_df['home_goals'] - all_matches_df['away_goals']
@@ -205,6 +183,10 @@ def configure_data():
             return 'draw'
 
     all_matches_df['match_result'] = all_matches_df.apply(determine_match_result, axis=1)
+    
+    # Add a column to indicate whether a game has been played
+    all_matches_df['played'] = all_matches_df['home_goals'].notna() & all_matches_df['away_goals'].notna()
+
     # Save combined data
     all_matches_df.to_csv('all_matches_combined.csv', index=False)
 

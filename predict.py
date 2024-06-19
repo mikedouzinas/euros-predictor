@@ -14,7 +14,7 @@ def predict_outcomes():
     euro_2024_fixtures_df['away_rank'] = euro_2024_fixtures_df['away_rank'].fillna(0)
 
     # Extract features for the upcoming fixtures
-    X_upcoming_fixtures = euro_2024_fixtures_df[features]
+    X_upcoming_fixtures = euro_2024_fixtures_df[euro_2024_fixtures_df['played'] == False][features]
 
     # Load the trained models
     clf_home_goals = joblib.load('home_goals_predictor.pkl')
@@ -23,23 +23,42 @@ def predict_outcomes():
     clf_away_xg = joblib.load('away_xg_predictor.pkl')
 
     # Predict the scores for the upcoming fixtures
-    euro_2024_fixtures_df['predicted_home_goals'] = clf_home_goals.predict(X_upcoming_fixtures)
-    euro_2024_fixtures_df['predicted_away_goals'] = clf_away_goals.predict(X_upcoming_fixtures)
-    euro_2024_fixtures_df['predicted_home_xg'] = clf_home_xg.predict(X_upcoming_fixtures)
-    euro_2024_fixtures_df['predicted_away_xg'] = clf_away_xg.predict(X_upcoming_fixtures)
+    euro_2024_fixtures_df.loc[euro_2024_fixtures_df['played'] == False, 'predicted_home_goals'] = clf_home_goals.predict(X_upcoming_fixtures)
+    euro_2024_fixtures_df.loc[euro_2024_fixtures_df['played'] == False, 'predicted_away_goals'] = clf_away_goals.predict(X_upcoming_fixtures)
+    euro_2024_fixtures_df.loc[euro_2024_fixtures_df['played'] == False, 'predicted_home_xg'] = clf_home_xg.predict(X_upcoming_fixtures)
+    euro_2024_fixtures_df.loc[euro_2024_fixtures_df['played'] == False, 'predicted_away_xg'] = clf_away_xg.predict(X_upcoming_fixtures)
 
+    # Fill NaN values with zeros before rounding and converting to integers
+    euro_2024_fixtures_df['predicted_home_goals'].fillna(0, inplace=True)
+    euro_2024_fixtures_df['predicted_away_goals'].fillna(0, inplace=True)
+    
     # Round the predicted goals to the nearest integer
     euro_2024_fixtures_df['predicted_home_goals'] = euro_2024_fixtures_df['predicted_home_goals'].round().astype(int)
     euro_2024_fixtures_df['predicted_away_goals'] = euro_2024_fixtures_df['predicted_away_goals'].round().astype(int)
 
-    # Determine the winning team or if it's a draw based on actual goals
+    # Update the predictions with actual results for played games
+    played_games_mask = euro_2024_fixtures_df['played'] == True
+    euro_2024_fixtures_df.loc[played_games_mask, 'predicted_home_goals'] = euro_2024_fixtures_df.loc[played_games_mask, 'home_goals']
+    euro_2024_fixtures_df.loc[played_games_mask, 'predicted_away_goals'] = euro_2024_fixtures_df.loc[played_games_mask, 'away_goals']
+    euro_2024_fixtures_df.loc[played_games_mask, 'predicted_home_xg'] = euro_2024_fixtures_df.loc[played_games_mask, 'home_xg']
+    euro_2024_fixtures_df.loc[played_games_mask, 'predicted_away_xg'] = euro_2024_fixtures_df.loc[played_games_mask, 'away_xg']
+
+    # Determine the winning team or if it's a draw based on actual or predicted goals
     def determine_winner(row):
-        if row['predicted_home_goals'] > row['predicted_away_goals']:
-            return row['home_team']
-        elif row['predicted_away_goals'] > row['predicted_home_goals']:
-            return row['away_team']
+        if row['played']:
+            if row['home_goals'] > row['away_goals']:
+                return row['home_team']
+            elif row['away_goals'] > row['home_goals']:
+                return row['away_team']
+            else:
+                return 'Draw'
         else:
-            return 'Draw'
+            if row['predicted_home_goals'] > row['predicted_away_goals']:
+                return row['home_team']
+            elif row['predicted_away_goals'] > row['predicted_home_goals']:
+                return row['away_team']
+            else:
+                return 'Draw'
 
     euro_2024_fixtures_df['winner'] = euro_2024_fixtures_df.apply(determine_winner, axis=1)
 
@@ -47,7 +66,7 @@ def predict_outcomes():
     euro_2024_fixtures_df.to_csv('euro_2024_score_predictions_with_winner.csv', index=False)
 
     # Print the predictions including the winner
-    print(euro_2024_fixtures_df[['home_team', 'away_team', 'predicted_home_goals', 'predicted_away_goals', 'predicted_home_xg', 'predicted_away_xg', 'winner']])
+    print(euro_2024_fixtures_df[['home_team', 'away_team', 'home_goals', 'away_goals', 'predicted_home_goals', 'predicted_away_goals', 'predicted_home_xg', 'predicted_away_xg', 'winner']])
 
     # Count the number of wins for each team
     wins = euro_2024_fixtures_df['winner'].value_counts()
@@ -98,10 +117,17 @@ def predict_outcomes():
         for _, row in predicted_df.iterrows():
             home_team = row['home_team'].lower()
             away_team = row['away_team'].lower()
-            predicted_home_goals = int(round(row['predicted_home_goals']))
-            predicted_away_goals = int(round(row['predicted_away_goals']))
-            predicted_home_xg = row['predicted_home_xg']
-            predicted_away_xg = row['predicted_away_xg']
+            if row['played']:
+                home_goals = row['home_goals']
+                away_goals = row['away_goals']
+                home_xg = row['predicted_home_xg']
+                away_xg = row['predicted_away_xg']
+            else:
+                home_goals = row['predicted_home_goals']
+                away_goals = row['predicted_away_goals']
+                home_xg = row['predicted_home_xg']
+                away_xg = row['predicted_away_xg']
+                
             winner = row['winner'].lower()
 
             # Update matches played
@@ -109,27 +135,27 @@ def predict_outcomes():
             team_stats[away_team]['MP'] += 1
 
             # Update goals for and against
-            team_stats[home_team]['GF'] += predicted_home_goals
-            team_stats[home_team]['GA'] += predicted_away_goals
-            team_stats[away_team]['GF'] += predicted_away_goals
-            team_stats[away_team]['GA'] += predicted_home_goals
+            team_stats[home_team]['GF'] += home_goals
+            team_stats[home_team]['GA'] += away_goals
+            team_stats[away_team]['GF'] += away_goals
+            team_stats[away_team]['GA'] += home_goals
 
             # Update expected goals for and against
-            team_stats[home_team]['xG'] += predicted_home_xg
-            team_stats[home_team]['xGA'] += predicted_away_xg
-            team_stats[away_team]['xG'] += predicted_away_xg
-            team_stats[away_team]['xGA'] += predicted_home_xg
+            team_stats[home_team]['xG'] += home_xg
+            team_stats[home_team]['xGA'] += away_xg
+            team_stats[away_team]['xG'] += away_xg
+            team_stats[away_team]['xGA'] += home_xg
 
             # Update goal difference
             team_stats[home_team]['GD'] = team_stats[home_team]['GF'] - team_stats[home_team]['GA']
             team_stats[away_team]['GD'] = team_stats[away_team]['GF'] - team_stats[away_team]['GA']
 
             # Update points and win/draw/loss counts
-            if predicted_home_goals > predicted_away_goals:
+            if home_goals > away_goals:
                 team_stats[home_team]['W'] += 1
                 team_stats[away_team]['L'] += 1
                 team_stats[home_team]['Pts'] += 3
-            elif predicted_home_goals < predicted_away_goals:
+            elif home_goals < away_goals:
                 team_stats[away_team]['W'] += 1
                 team_stats[home_team]['L'] += 1
                 team_stats[away_team]['Pts'] += 3
