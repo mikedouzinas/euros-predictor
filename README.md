@@ -51,7 +51,6 @@ Welcome to the Euro 2024 Predictor! This project uses machine learning to predic
 |  1 | Türkiye  |  3 | 1 | 1 | 1 |  4 |  3 |  1 |   4 | 3.691 | 3.854 |
 |  2 | Czechia  |  3 | 0 | 2 | 1 |  3 |  4 | -1 |   2 | 1.860 | 2.872 |
 |  3 | Georgia  |  3 | 0 | 1 | 2 |  2 |  8 | -6 |   1 | 2.178 | 5.286 |
-"""
 
 
 ## Table of Contents
